@@ -8,16 +8,17 @@ from github import Github, Repository, ContentFile
 auth_file_regex_pattern = ".*?(auth|login|oidc|session).*?\.(ts|js)"
 auth_regex = re.compile(auth_file_regex_pattern)
 
-
 dir_patterns = ["auth", "oidc", "login", "session", "src", "server", "srv"]
+
+query = "oidc-client filename:package.json path:/ express filename:package.json"
 
 
 def scraper():
-    query = "oidc-client filename:package.json path:/ express filename:package.json"
+
     # using an access token
     g = Github(os.getenv("AITM_TOKEN"))
 
-    print(f"query = {query}")
+    print(f"AitM Scraper starting with query = {query}")
     result = g.search_code(query=query)
     print(f"Total results from query = {result.totalCount}")
 
@@ -30,7 +31,7 @@ def scraper():
 
 
 def find_auth_files(repo: Repository) -> typing.List:
-    print(f"Searching for auth files for repo = {repo.name}")
+    print(f"Searching for auth files for repo = {repo.url}")
     auth_files = []
     root_contents = repo.get_contents("")
     while root_contents:
