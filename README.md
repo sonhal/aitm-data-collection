@@ -10,7 +10,7 @@
 
 - search for projects using Github api search
 
-    `oidc-client in:file language:javascript nodejs`
+    `oidc-client filename:package.json path:/ express filename:package.json`
 - look for files that indicate that they implement authentication
 
 - get average, median, min and max LoC of authentication code
