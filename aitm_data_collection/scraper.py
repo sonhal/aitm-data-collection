@@ -8,26 +8,41 @@ from github import Github, Repository, ContentFile
 auth_file_regex_pattern = ".*?(auth|login|oidc|session).*?\.(ts|js)"
 auth_regex = re.compile(auth_file_regex_pattern)
 
-dir_patterns = ["auth", "oidc", "login", "session", "src", "server", "srv"]
+dir_patterns = ["auth", "oidc", "login", "session", "src", "server", "srv", "app", "middleware", "services", "service"]
 
-query = "oidc-client filename:package.json path:/ express filename:package.json"
+query1 = "oidc-client filename:package.json path:/ express filename:package.json"
+query2 = "openid-client filename:package.json path:/ express filename:package.json"
 
+queries = [query1, query2]
 
 def scraper():
 
     # using an access token
     g = Github(os.getenv("AITM_TOKEN"))
+    repo_to_auth_files = {}
+    for query in queries:
+        print(f"AitM Scraper running query = {query}")
+        result = g.search_code(query=query)
+        print(f"Total results from query = {result.totalCount}")
 
-    print(f"AitM Scraper starting with query = {query}")
-    result = g.search_code(query=query)
-    print(f"Total results from query = {result.totalCount}")
+        # Get one of the available pages
 
-    # Get one of the available pages
-    page = result.get_page(0)
+        for i in range(0, result.totalCount):
+            page = result.get_page(i)
 
-    # create a mapping of repos to likely authentication related source files (js, ts) in the repo
-    repo__auth_files = {file.repository: find_auth_files(file.repository) for file in page}
-    print(repo__auth_files)
+            # create a mapping of repos to likely authentication related source files (js, ts) in the repo
+            new = {file.repository: find_auth_files(file.repository) for file in page}
+            repo_to_auth_files = {**repo_to_auth_files, **new}
+    repo_to_auth_files = dict(filter(lambda elem: len(elem[1]) > 0, repo_to_auth_files.items()))
+    print(f"result nr = {len(repo_to_auth_files)}")
+    print(repo_to_auth_files)
+
+    summer = 0
+    for repo, auth_files in repo_to_auth_files.items():
+        for file, loc in auth_files:
+            summer += loc
+    print(f"total loc = {summer}")
+    print(f"average loc = {summer / len(repo_to_auth_files)}")
 
 
 def find_auth_files(repo: Repository) -> typing.List:
@@ -41,7 +56,7 @@ def find_auth_files(repo: Repository) -> typing.List:
         else:
             if is_auth_file(file_content.name):
                 print(f"auth file = {file_content.name} found for repo = {repo.name}")
-                auth_files.append(file_content)
+                auth_files.append((file_content, file_loc(file_content)))
     return auth_files
 
 
@@ -54,6 +69,10 @@ def is_server_or_auth_dir(name: str) -> bool:
         if pattern in name:
             return True
     return False
+
+
+def file_loc(file: ContentFile):
+    return sum(1 for _ in file.content.split("\n"))
 
 
 if __name__ == '__main__':
