@@ -67,7 +67,7 @@ def find_repos_for(query, token):
                 f"x-ratelimit-remaining = {e.headers['x-ratelimit-remaining']} "
                 f"x-ratelimit-reset = {e.headers['x-ratelimit-reset']} ({reset_in.seconds}s)")
             print(f"ratelimit hit, waiting {reset_in_seconds} sec...")
-            sleep(reset_in_seconds)
+            sleep(reset_in_seconds) # TODO do we miss a page here
         except GithubException as e:
             print(f"Github exception {e.data}")
             print("Halting search and returning results found")
@@ -77,19 +77,18 @@ def find_repos_for(query, token):
 
 def find_auth_files(repo: Repository) -> typing.List:
     print(f"Searching for auth files for repo = {repo.url}")
-    auth_files = []
     try:
         root_contents = repo.get_contents("")
-        auth_files.append(search_repo_files(root_contents, repo))
+        return search_repo_files(root_contents, repo)
     except GithubException as ge:
         if ge.status == 403:
             print(f"Access denied for repo, skipping: {ge}")
         else:
             raise ge
-    return auth_files
 
 
 def search_repo_files(root_contents, repo):
+    auth_files = []
     while root_contents:
         file_content = root_contents.pop(0)
         if file_content.type == "dir" and is_server_or_auth_dir(file_content.name):
@@ -97,7 +96,8 @@ def search_repo_files(root_contents, repo):
         else:
             if is_auth_file(file_content.name):
                 print(f"auth file = {file_content.name} found for repo = {repo.name}")
-                return file_content, file_loc(file_content)
+                auth_files.append((file_content, file_loc(file_content)))
+    return auth_files
 
 
 def is_auth_file(name: str) -> bool:
@@ -119,7 +119,7 @@ def avg_loc(files):
 
 
 def file_loc(file: ContentFile):
-    return sum(1 for _ in file.content.split("\n"))
+    return len(file.decoded_content.split(b"\n"))
 
 
 def store_repos(repositories):
