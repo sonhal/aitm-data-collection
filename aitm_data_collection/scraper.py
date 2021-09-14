@@ -8,6 +8,7 @@ import pickle
 from dotenv import load_dotenv
 from github import Github, Repository, ContentFile, RateLimitExceededException, GithubException
 from typing import List
+import statistics
 
 auth_file_regex_pattern = ".*?(auth|login|oidc|session).*?\.(ts|js)"
 auth_regex = re.compile(auth_file_regex_pattern)
@@ -42,12 +43,16 @@ def scraper():
     except RateLimitExceededException as e:
         print(e)
 
-    summer = 0
+    loc_array = []
     for repo, auth_files in repo_to_auth_files.items():
         for file, loc in auth_files:
-            summer += loc
-    print(f"total loc = {summer}")
-    print(f"average loc = {summer / len(repo_to_auth_files)}")
+            loc_array.append(loc)
+    print(f"total loc = {sum(loc_array)}")
+    print(f"average loc = {statistics.mean(loc_array)}")
+    print(f"median loc = {statistics.median(loc_array)}")
+    print(f"standard deviation loc = {statistics.stdev(loc_array)}")
+    print(f"min loc = {min(loc_array)}")
+    print(f"max loc = {max(loc_array)}")
 
 
 def find_repos_for(query, token):
