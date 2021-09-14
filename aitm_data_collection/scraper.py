@@ -4,11 +4,13 @@ import datetime
 import typing
 from time import sleep
 import pickle
+from collections import namedtuple
 
 from dotenv import load_dotenv
 from github import Github, Repository, ContentFile, RateLimitExceededException, GithubException
 from typing import List
 import statistics
+import pandas
 
 auth_file_regex_pattern = ".*?(auth|login|oidc|session).*?\.(ts|js)"
 auth_regex = re.compile(auth_file_regex_pattern)
@@ -59,9 +61,11 @@ def find_repos_for(query, token):
     g = Github(token)
     result = g.search_code(query=query)
     repos = []
-    for i in range(0, result.totalCount):
+    i = 0
+    while i < result.totalCount:  # use while loop so we don`t skip page on exceptions
         try:
             repos += result.get_page(i)
+            i += 1
         except RateLimitExceededException as e:
             reset_at = datetime.datetime.fromtimestamp(float(e.headers["x-ratelimit-reset"]))
             reset_in = (reset_at - datetime.datetime.now())
@@ -72,7 +76,7 @@ def find_repos_for(query, token):
                 f"x-ratelimit-remaining = {e.headers['x-ratelimit-remaining']} "
                 f"x-ratelimit-reset = {e.headers['x-ratelimit-reset']} ({reset_in.seconds}s)")
             print(f"ratelimit hit, waiting {reset_in_seconds} sec...")
-            sleep(reset_in_seconds) # TODO do we miss a page here
+            sleep(reset_in_seconds)
         except GithubException as e:
             print(f"Github exception {e.data}")
             print("Halting search and returning results found")
@@ -92,6 +96,9 @@ def find_auth_files(repo: Repository) -> typing.List:
             raise ge
 
 
+AuthFile = namedtuple("AuthFile", "file , loc")
+
+
 def search_repo_files(root_contents, repo):
     auth_files = []
     while root_contents:
@@ -101,7 +108,7 @@ def search_repo_files(root_contents, repo):
         else:
             if is_auth_file(file_content.name):
                 print(f"auth file = {file_content.name} found for repo = {repo.name}")
-                auth_files.append((file_content, file_loc(file_content)))
+                auth_files.append(AuthFile(file_content, file_loc(file_content)))
     return auth_files
 
 
@@ -127,13 +134,31 @@ def file_loc(file: ContentFile):
     return len(file.decoded_content.split(b"\n"))
 
 
+def repo_auth_file_mapping_to_flat(mappings):
+    data = []
+    for repo, auth_files in mappings.items():
+        for auth_file in auth_files:
+            data.append((repo.html_url, auth_file.file.html_url, auth_file.loc))
+    return data
+
+
 def store_repos(repositories):
-    with open("data/repos_store.pickle", 'wb') as store:
+    with open("../data/repos_store.pickle", 'wb') as store:
         pickle.dump(repositories, store)
 
 
 def load_repos() -> List[Repository.Repository]:
-    with open("data/repos_store.pickle", 'rb') as store:
+    with open("../data/repos_store.pickle", 'rb') as store:
+        return pickle.load(store)
+
+
+def store_mappings(repo_to_auth):
+    with open("../data/repo_to_auth_mapping.pickle", 'wb') as store:
+        pickle.dump(repo_to_auth, store)
+
+
+def load_mappings() -> List[Repository.Repository]:
+    with open("../data/repo_to_auth_mapping.pickle", 'rb') as store:
         return pickle.load(store)
 
 

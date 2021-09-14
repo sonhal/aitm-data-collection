@@ -137,4 +137,4 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-aitm_data_collection/data/
+data/
